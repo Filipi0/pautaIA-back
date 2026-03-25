@@ -2,7 +2,7 @@ const prisma = require('../config/prisma');
 
 class PautaController {
   // Criar nova pauta
- async store(req, res) {
+ async salvarRedacao(req, res) {
   try {
     const { tema, corpo, totalLinhas, totalPalavras, totalCaracteres, marcacoes } = req.body;
     
@@ -24,7 +24,7 @@ class PautaController {
 }
 
   // Listar todas as pautas
-  async index(req, res) {
+  async listarRedacoes(req, res) {
     try {
       const pautas = await prisma.pauta.findMany({
         orderBy: { createdAt: 'desc' }
@@ -36,7 +36,7 @@ class PautaController {
   }
 
   // Buscar uma pauta específica por ID
-  async show(req, res) {
+  async buscarPorId(req, res) {
     try {
       const { id } = req.params;
       const pauta = await prisma.pauta.findUnique({

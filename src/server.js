@@ -1,5 +1,5 @@
 const express = require('express');
-const cors = require('cors'); // Importe o cors
+const cors = require('cors');
 const pautaRoutes = require('./routes/pautaRoutes');
 
 const app = express();
