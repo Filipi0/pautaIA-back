@@ -6,7 +6,7 @@ class PautaController {
   try {
     const { tema, corpo, totalLinhas, totalPalavras, totalCaracteres, marcacoes } = req.body;
     
-    const redacao = await prisma.redacao.create({
+    const pauta = await prisma.pauta.create({
       data: {
         tema,
         corpo,
@@ -17,7 +17,7 @@ class PautaController {
       }
     });
     
-    return res.status(201).json(redacao);
+    return res.status(201).json(pauta);
   } catch (error) {
     return res.status(400).json({ error: 'Falha ao salvar redação' });
   }

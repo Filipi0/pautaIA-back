@@ -13,7 +13,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Redacao {
+model Pauta {
   id              Int      @id @default(autoincrement())
   tema            String
   corpo           String   @db.Text
