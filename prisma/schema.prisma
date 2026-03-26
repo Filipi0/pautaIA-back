@@ -13,15 +13,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Theme {
+  id          Int     @id @default(autoincrement())
+  title       String  @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relação com Pautas
+  pautas      Pauta[]
+}
+
 model Pauta {
   id              Int      @id @default(autoincrement())
-  tema            String
+  tema            String   // Título/tema da redação
   corpo           String   @db.Text
   totalLinhas     Int      @default(0)
   totalPalavras   Int      @default(0)
   totalCaracteres Int      @default(0)
   // Armazenamos as marcações como JSON ou Strings formatadas
   marcacoes       Json?    
+  // Nova funcionalidade: mapa de estrutura da redação
+  structure_map   Json?    // { intro: [1,2,3], dev1: [4,5,6], dev2: [7,8,9], conclusion: [10,11,12] }
+  
+  // Relacionamento com Theme (Tema/Proposta)
+  themeId         Int?
+  theme           Theme?   @relation(fields: [themeId], references: [id], onDelete: SetNull)
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
