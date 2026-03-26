@@ -3,77 +3,6 @@ const PDFDocument = require("pdfkit");
 const RedacaoValidator = require("../validators/redacaoValidator");
 
 class PautaController {
-  // ---- GERENCIAMENTO DE TEMAS ----
-
-  /**
-   * Criar um novo tema
-   */
-  async criarTema(req, res) {
-    try {
-      const { title, description } = req.body;
-
-      if (!title || title.trim() === "") {
-        return res.status(400).json({ error: "Título do tema é obrigatório" });
-      }
-
-      const novoTema = await prisma.theme.create({
-        data: {
-          title: title.trim(),
-          description: description || null,
-        },
-      });
-
-      return res.status(201).json(novoTema);
-    } catch (error) {
-      if (error.code === "P2002") {
-        return res
-          .status(400)
-          .json({ error: "Já existe um tema com este título" });
-      }
-      return res.status(400).json({ error: "Falha ao criar tema" });
-    }
-  }
-
-  /**
-   * Listar todos os temas
-   */
-  async listarTemas(req, res) {
-    try {
-      const temas = await prisma.theme.findMany({
-        orderBy: { createdAt: "desc" },
-      });
-      return res.json(temas);
-    } catch (error) {
-      return res.status(500).json({ error: "Erro ao buscar temas" });
-    }
-  }
-
-  /**
-   * Buscar um tema específico com suas redações
-   */
-  async buscarTemaComRedacoes(req, res) {
-    try {
-      const { id } = req.params;
-
-      const tema = await prisma.theme.findUnique({
-        where: { id: Number(id) },
-        include: {
-          pautas: {
-            orderBy: { createdAt: "desc" },
-          },
-        },
-      });
-
-      if (!tema)
-        return res.status(404).json({ error: "Tema não encontrado" });
-      return res.json(tema);
-    } catch (error) {
-      return res.status(500).json({ error: "Erro ao buscar tema" });
-    }
-  }
-
-  // ---- GERENCIAMENTO DE REDAÇÕES ----
-
   /**
    * Criar nova redação - Aceita array de linhas do frontend
    */
@@ -96,15 +25,12 @@ class PautaController {
           .json({ error: "Título/tema da redação é obrigatório" });
       }
 
-      // O frontend envia array de linhas, backend junta com \n para salvar
-      const corpoParaSalvar = linhasFront ? linhasFront.join('\n') : "";
-
-      if (!corpoParaSalvar || corpoParaSalvar.trim() === "") {
+      if (!linhasFront || linhasFront.length === 0) {
         return res.status(400).json({ error: "Texto da redação é obrigatório" });
       }
 
-      // Validar regras do ENEM
-      const validacao = RedacaoValidator.validar(corpoParaSalvar);
+      // Validar regras do ENEM - passa o array direto
+      const validacao = RedacaoValidator.validar(linhasFront);
 
       if (!validacao.válido) {
         return res.status(400).json({
@@ -119,11 +45,14 @@ class PautaController {
         console.warn("Avisos na redação:", validacao.avisos);
       }
 
+      // Criar string para salvar no banco usando linhas sanitizadas
+      const corpoParaSalvar = validacao.linhasSanitizadas ? validacao.linhasSanitizadas.join('\n') : "";
+
       // Validar structure_map se fornecido
       if (structure_map) {
         const validacaoStructure = RedacaoValidator.validarStructureMap(
           structure_map,
-          validacao.totalLinhas
+          validacao.totalLinhasEscritas
         );
         if (!validacaoStructure.válido) {
           return res.status(400).json({
@@ -147,7 +76,7 @@ class PautaController {
       const dadosRedacao = {
         tema: tema.trim(),
         corpo: corpoParaSalvar,
-        totalLinhas: totalLinhas || validacao.totalLinhas,
+        totalLinhas: totalLinhas || validacao.totalLinhasEscritas,
         totalPalavras: totalPalavras || 0,
         totalCaracteres: totalCaracteres || 0,
         marcacoes: marcacoes || null,
@@ -235,15 +164,10 @@ class PautaController {
         themeId,
       } = req.body;
 
-      // Se linhasFront foi alterado, junta com \n
-      let corpoParaValidar = corpo;
+      // Se linhasFront foi enviado, validar o array direto
+      let validacao = null;
       if (linhasFront) {
-        corpoParaValidar = linhasFront.join('\n');
-      }
-
-      // Se corpo foi alterado, validar novamente
-      if (corpoParaValidar) {
-        const validacao = RedacaoValidator.validar(corpoParaValidar);
+        validacao = RedacaoValidator.validar(linhasFront);
 
         if (!validacao.válido) {
           return res.status(400).json({
@@ -257,7 +181,7 @@ class PautaController {
         if (structure_map) {
           const validacaoStructure = RedacaoValidator.validarStructureMap(
             structure_map,
-            validacao.totalLinhas
+            validacao.totalLinhasEscritas
           );
           if (!validacaoStructure.válido) {
             return res.status(400).json({
@@ -282,12 +206,16 @@ class PautaController {
       const dadosAtualizacao = {};
 
       if (tema !== undefined) dadosAtualizacao.tema = tema.trim();
-      if (linhasFront !== undefined) {
-        dadosAtualizacao.corpo = linhasFront.join('\n');
+      
+      // Se linhasFront foi alterado, usar linhas sanitizadas
+      if (linhasFront !== undefined && validacao) {
+        dadosAtualizacao.corpo = validacao.linhasSanitizadas ? validacao.linhasSanitizadas.join('\n') : "";
+        dadosAtualizacao.totalLinhas = validacao.totalLinhasEscritas;
       } else if (corpo !== undefined) {
         dadosAtualizacao.corpo = corpo;
+      } else if (totalLinhas !== undefined) {
+        dadosAtualizacao.totalLinhas = totalLinhas;
       }
-      if (totalLinhas !== undefined) dadosAtualizacao.totalLinhas = totalLinhas;
       if (totalPalavras !== undefined)
         dadosAtualizacao.totalPalavras = totalPalavras;
       if (totalCaracteres !== undefined)
@@ -440,6 +368,63 @@ class PautaController {
     } catch (error) {
       console.error("Erro PDF:", error);
       res.status(500).json({ error: "Erro ao gerar arquivo PDF" });
+    }
+  }
+
+  /**
+   * Corrigir uma redação usando IA
+   */
+  async corrigirRedacao(req, res) {
+    try {
+      const { id } = req.params;
+      const { tema, corpo } = req.body;
+
+      // Forçar reload do módulo para pegar a versão mais recente
+      const CorrecaoIAFresh = require("../services/CorrecaoIA");
+
+      // Se ID for fornecido, buscar redação no banco
+      let redacao = null;
+      if (id) {
+        redacao = await prisma.pauta.findUnique({
+          where: { id: Number(id) },
+        });
+
+        if (!redacao) {
+          return res.status(404).json({ error: "Redação não encontrada" });
+        }
+      } else if (!tema || !corpo) {
+        // Se não tiver ID, tema e corpo são obrigatórios
+        return res.status(400).json({
+          error: "Forneça um ID de redação ou tema e corpo",
+        });
+      }
+
+      // Usar dados da redação no banco ou do corpo enviado
+      const temaParaCorrigir = redacao?.tema || tema;
+      const corpoParaCorrigir = redacao?.corpo || corpo;
+
+      if (!temaParaCorrigir || !corpoParaCorrigir) {
+        return res.status(400).json({
+          error: "Tema e corpo da redação são obrigatórios para correção",
+        });
+      }
+
+      // Chamar o serviço de IA
+      const correcao = await CorrecaoIAFresh.corrigirRedacao(
+        temaParaCorrigir,
+        corpoParaCorrigir
+      );
+
+      return res.json({
+        success: true,
+        data: correcao,
+      });
+    } catch (error) {
+      console.error("Erro ao corrigir redação:", error);
+      return res.status(500).json({
+        error: "Falha ao corrigir redação com IA",
+        detalhes: error.message,
+      });
     }
   }
 }
