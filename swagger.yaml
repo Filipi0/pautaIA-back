@@ -1,0 +1,635 @@
+openapi: 3.0.0
+info:
+  title: PautaIA API
+  description: API para gerenciamento de redações e temas com correção por IA
+  version: 1.0.0
+  contact:
+    name: PautaIA Support
+
+servers:
+  - url: http://localhost:3000
+    description: Desenvolvimento
+  - url: http://localhost:3001
+    description: Produção
+
+components:
+  schemas:
+    Theme:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único do tema
+        title:
+          type: string
+          description: Título do tema
+        description:
+          type: string
+          nullable: true
+          description: Descrição do tema
+        createdAt:
+          type: string
+          format: date-time
+          description: Data de criação
+        updatedAt:
+          type: string
+          format: date-time
+          description: Data da última atualização
+      required:
+        - id
+        - title
+        - createdAt
+        - updatedAt
+
+    Pauta:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único da redação
+        tema:
+          type: string
+          description: Título/tema da redação
+        corpo:
+          type: string
+          description: Conteúdo da redação em texto
+        totalLinhas:
+          type: integer
+          description: Total de linhas da redação
+        totalPalavras:
+          type: integer
+          description: Total de palavras da redação
+        totalCaracteres:
+          type: integer
+          description: Total de caracteres da redação
+        marcacoes:
+          type: object
+          nullable: true
+          description: Marcações associadas ao texto (JSON)
+        structure_map:
+          type: object
+          nullable: true
+          description: Mapa de estrutura da redação com seções (intro, dev1, dev2, conclusão)
+        themeId:
+          type: integer
+          nullable: true
+          description: ID do tema associado
+        theme:
+          $ref: '#/components/schemas/Theme'
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Data de criação
+        updatedAt:
+          type: string
+          format: date-time
+          description: Data da última atualização
+      required:
+        - id
+        - tema
+        - corpo
+        - createdAt
+        - updatedAt
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Mensagem de erro
+        erros:
+          type: array
+          items:
+            type: string
+          description: Lista de erros de validação
+        avisos:
+          type: array
+          items:
+            type: string
+          description: Lista de avisos (redação abaixo do esperado, etc)
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+        avisos:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+paths:
+  /redacoes:
+    post:
+      tags:
+        - Redações
+      summary: Criar nova redação
+      description: Cria uma nova redação com validação de critérios ENEM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tema:
+                  type: string
+                  description: Título/tema da redação
+                linhasFront:
+                  type: array
+                  items:
+                    type: string
+                  description: Array de linhas do texto da redação
+                totalLinhas:
+                  type: integer
+                  nullable: true
+                totalPalavras:
+                  type: integer
+                  nullable: true
+                totalCaracteres:
+                  type: integer
+                  nullable: true
+                marcacoes:
+                  type: object
+                  nullable: true
+                  description: Marcações do texto (JSON)
+                structure_map:
+                  type: object
+                  nullable: true
+                  description: Mapa de estrutura com seções (intro, dev1, dev2, conclusion) mapeando números de linhas
+                themeId:
+                  type: integer
+                  nullable: true
+                  description: ID do tema associado
+              required:
+                - tema
+                - linhasFront
+            examples:
+              basic:
+                value:
+                  tema: "Inteligência Artificial na Educação"
+                  linhasFront:
+                    - "A inteligência artificial revoluciona a educação"
+                    - "Nos últimos anos, a IA tem transformado"
+                    - "Portanto, é fundamental investir em tecnologia"
+                  totalLinhas: 3
+              withStructure:
+                value:
+                  tema: "Sustentabilidade"
+                  linhasFront:
+                    - "Introdução sobre sustentabilidade"
+                    - "Desenvolvimento 1"
+                    - "Desenvolvimento 2"
+                    - "Conclusão"
+                  structure_map:
+                    intro:
+                      - 1
+                    dev1:
+                      - 2
+                    dev2:
+                      - 3
+                    conclusion:
+                      - 4
+                  themeId: 1
+      responses:
+        '201':
+          description: Redação criada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Pauta'
+                  avisos:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Erro de validação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Erro ao salvar redação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags:
+        - Redações
+      summary: Listar todas as redações
+      description: Retorna uma lista de todas as redações cadastradas, ordenadas por data de criação (mais recentes primeiro)
+      responses:
+        '200':
+          description: Lista de redações
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pauta'
+        '500':
+          description: Erro ao buscar redações
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /redacoes/{id}:
+    get:
+      tags:
+        - Redações
+      summary: Buscar redação por ID
+      description: Retorna os detalhes de uma redação específica
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID da redação
+      responses:
+        '200':
+          description: Redação encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pauta'
+        '404':
+          description: Redação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Erro ao buscar redação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Redações
+      summary: Atualizar redação
+      description: Atualiza uma redação existente. Aceita linhasFront (array) ou corpo (string)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID da redação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tema:
+                  type: string
+                  nullable: true
+                corpo:
+                  type: string
+                  nullable: true
+                  description: Texto da redação (alternativa a linhasFront)
+                linhasFront:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                  description: Array de linhas (alternativa a corpo)
+                totalLinhas:
+                  type: integer
+                  nullable: true
+                totalPalavras:
+                  type: integer
+                  nullable: true
+                totalCaracteres:
+                  type: integer
+                  nullable: true
+                marcacoes:
+                  type: object
+                  nullable: true
+                structure_map:
+                  type: object
+                  nullable: true
+                themeId:
+                  type: integer
+                  nullable: true
+      responses:
+        '200':
+          description: Redação atualizada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Erro de validação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '404':
+          description: Redação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Erro ao atualizar redação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Redações
+      summary: Deletar redação
+      description: Remove uma redação do banco de dados
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID da redação
+      responses:
+        '200':
+          description: Redação deletada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  mensagem:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Pauta'
+        '404':
+          description: Redação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Erro ao deletar redação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /redacoes/{id}/pdf:
+    get:
+      tags:
+        - Redações
+      summary: Exportar redação como PDF
+      description: Exporta uma redação em formato PDF com paginação em 30 linhas
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID da redação
+      responses:
+        '200':
+          description: PDF gerado com sucesso
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Redação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /redacoes/{id}/correcao:
+    post:
+      tags:
+        - Correção IA
+      summary: Corrigir redação com IA
+      description: Analisa a redação com IA do Google Gemini e retorna correções e sugestões
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID da redação
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                promptCustomizado:
+                  type: string
+                  nullable: true
+                  description: Prompt customizado para a IA (opcional)
+      responses:
+        '200':
+          description: Correção realizada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  correcao:
+                    type: string
+                    description: Resposta da IA com análise da redação
+                  pautaId:
+                    type: integer
+        '404':
+          description: Redação não encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Erro na correção
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /correcao:
+    post:
+      tags:
+        - Correção IA
+      summary: Corrigir redação (sem salvar)
+      description: Analisa uma redação com IA sem necessidade de ter já salvo no banco de dados
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                texto:
+                  type: string
+                  description: Texto da redação a corrigir
+                tema:
+                  type: string
+                  nullable: true
+                  description: Tema/assunto da redação
+                promptCustomizado:
+                  type: string
+                  nullable: true
+                  description: Prompt customizado para a IA
+              required:
+                - texto
+      responses:
+        '200':
+          description: Correção realizada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  correcao:
+                    type: string
+        '400':
+          description: Erro de validação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Erro na correção
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /temas:
+    post:
+      tags:
+        - Temas
+      summary: Criar novo tema
+      description: Cria um novo tema que pode ser associado a redações
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: Título do tema (único)
+                description:
+                  type: string
+                  nullable: true
+                  description: Descrição do tema
+              required:
+                - title
+              example:
+                title: "Inteligência Artificial"
+                description: "Tema sobre como a IA impacta a sociedade"
+      responses:
+        '201':
+          description: Tema criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Theme'
+        '400':
+          description: Erro - Tema duplicado ou dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags:
+        - Temas
+      summary: Listar todos os temas
+      description: Retorna uma lista de todos os temas cadastrados, ordenados por data de criação
+      responses:
+        '200':
+          description: Lista de temas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Theme'
+        '500':
+          description: Erro ao buscar temas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /temas/{id}:
+    get:
+      tags:
+        - Temas
+      summary: Buscar tema com suas redações
+      description: Retorna um tema específico junto com todas as redações associadas a ele
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID do tema
+      responses:
+        '200':
+          description: Tema encontrado com redações
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Theme'
+                  - type: object
+                    properties:
+                      pautas:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Pauta'
+        '404':
+          description: Tema não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Erro ao buscar tema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Redações
+    description: Operações de CRUD para redações (pautas)
+  - name: Temas
+    description: Operações para gerenciar temas de redações
+  - name: Correção IA
+    description: Operações de correção e análise com Inteligência Artificial

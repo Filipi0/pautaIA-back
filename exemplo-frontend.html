@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PautaIA - Editor de Redações</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            opacity: 0.9;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-family: inherit;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 150px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .button-group button {
+            flex: 1;
+        }
+
+        .success-message, .error-message, .info-message {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: none;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: none;
+        }
+
+        .info-message {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: none;
+        }
+
+        .redacao-item {
+            background: #f5f5f5;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .redacao-item:hover {
+            background: #efefef;
+            transform: translateX(5px);
+        }
+
+        .redacao-item h4 {
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .redacao-details {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .redacao-details span {
+            margin-right: 15px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .stat-box strong {
+            color: #667eea;
+            display: block;
+            font-size: 1.2em;
+        }
+
+        .stat-box small {
+            color: #666;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .correction-text {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>✍️ PautaIA</h1>
+            <p>Editor de Redações com Correção por IA</p>
+        </header>
+
+        <div class="content">
+            <!-- Seção de Criação -->
+            <div class="section">
+                <h2>📝 Nova Redação</h2>
+                
+                <div id="successMsg" class="success-message"></div>
+                <div id="errorMsg" class="error-message"></div>
+                <div id="infoMsg" class="info-message"></div>
+
+                <form id="novaRedacaoForm">
+                    <input 
+                        type="text" 
+                        id="tema" 
+                        placeholder="Tema da redação"
+                        required
+                    />
+
+                    <textarea 
+                        id="texto" 
+                        placeholder="Digite sua redação aqui..."
+                        required
+                    ></textarea>
+
+                    <div class="stats" id="stats">
+                        <div class="stat-box">
+                            <strong id="totalLinhas">0</strong>
+                            <small>Linhas</small>
+                        </div>
+                        <div class="stat-box">
+                            <strong id="totalPalavras">0</strong>
+                            <small>Palavras</small>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit">Salvar Redação</button>
+                        <button type="button" onclick="limparFormulario()">Limpar</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Seção de Listagem -->
+            <div class="section">
+                <h2>📚 Minhas Redações</h2>
+                
+                <div style="margin-bottom: 15px;">
+                    <button onclick="carregarRedacoes()" style="width: 100%;">
+                        🔄 Atualizar Lista
+                    </button>
+                </div>
+
+                <div id="listaRedacoes">
+                    <p>Carregando redações...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Correção -->
+    <div id="correcaoModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="fecharModal()">&times;</button>
+            <h2>Correção da IA</h2>
+            <div id="correcaoTexto" class="correction-text">
+                Carregando...
+            </div>
+            <button onclick="fecharModal()" style="width: 100%; margin-top: 20px;">Fechar</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000';
+        let redacaoSelecionada = null;
+
+        // ============ INICIALIZAÇÃO ============
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('novaRedacaoForm').addEventListener('submit', salvarRedacao);
+            document.getElementById('texto').addEventListener('input', atualizarEstatisticas);
+            carregarRedacoes();
+        });
+
+        // ============ UTILITÁRIOS ============
+        function mostrarMensagem(tipo, mensagem) {
+            const elementos = {
+                success: document.getElementById('successMsg'),
+                error: document.getElementById('errorMsg'),
+                info: document.getElementById('infoMsg')
+            };
+
+            // Limpar todas as mensagens
+            Object.values(elementos).forEach(el => el.style.display = 'none');
+
+            // Mostrar mensagem apropriada
+            const el = elementos[tipo];
+            el.textContent = mensagem;
+            el.style.display = 'block';
+
+            // Auto-ocultar após 5 segundos
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 5000);
+        }
+
+        function atualizarEstatisticas() {
+            const texto = document.getElementById('texto').value;
+            const linhas = texto.split('\n').filter(l => l.trim()).length;
+            const palavras = texto.trim().split(/\s+/).length;
+
+            document.getElementById('totalLinhas').textContent = linhas;
+            document.getElementById('totalPalavras').textContent = palavras || 0;
+        }
+
+        function limparFormulario() {
+            document.getElementById('novaRedacaoForm').reset();
+            atualizarEstatisticas();
+            mostrarMensagem('info', 'Formulário limpo');
+        }
+
+        function fecharModal() {
+            document.getElementById('correcaoModal').classList.remove('active');
+        }
+
+        // ============ API CALLS ============
+        async function salvarRedacao(e) {
+            e.preventDefault();
+
+            const tema = document.getElementById('tema').value;
+            const texto = document.getElementById('texto').value;
+            const linhas = texto.split('\n').filter(l => l.trim());
+            const palavras = texto.trim().split(/\s+/).length;
+
+            if (!tema.trim() || !texto.trim()) {
+                mostrarMensagem('error', 'Tema e texto são obrigatórios');
+                return;
+            }
+
+            const botao = e.target.querySelector('button[type="submit"]');
+            botao.disabled = true;
+            botao.innerHTML = 'Salvando... <span class="loading"></span>';
+
+            try {
+                const response = await fetch(`${API_URL}/redacoes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tema,
+                        linhasFront: linhas,
+                        totalLinhas: linhas.length,
+                        totalPalavras: palavras
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    mostrarMensagem('error', data.error || 'Erro ao salvar');
+                    return;
+                }
+
+                mostrarMensagem('success', 'Redação salva com sucesso!');
+                limparFormulario();
+                carregarRedacoes();
+            } catch (err) {
+                mostrarMensagem('error', 'Erro de conexão: ' + err.message);
+            } finally {
+                botao.disabled = false;
+                botao.innerHTML = 'Salvar Redação';
+            }
+        }
+
+        async function carregarRedacoes() {
+            try {
+                const response = await fetch(`${API_URL}/redacoes`);
+                const dados = await response.json();
+
+                if (!Array.isArray(dados)) {
+                    mostrarMensagem('error', 'Erro ao carregar redações');
+                    return;
+                }
+
+                const lista = document.getElementById('listaRedacoes');
+                
+                if (dados.length === 0) {
+                    lista.innerHTML = '<p>Nenhuma redação salva ainda.</p>';
+                    return;
+                }
+
+                lista.innerHTML = dados.map(redacao => `
+                    <div class="redacao-item" onclick="selecionarRedacao(${redacao.id})">
+                        <h4>${redacao.tema}</h4>
+                        <div class="redacao-details">
+                            <span>📝 ${redacao.totalLinhas || 0} linhas</span>
+                            <span>📄 ${redacao.totalPalavras || 0} palavras</span>
+                            <span>📅 ${new Date(redacao.createdAt).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                mostrarMensagem('error', 'Erro ao carregar redações: ' + err.message);
+            }
+        }
+
+        function selecionarRedacao(id) {
+            redacaoSelecionada = id;
+            corrigirComIA(id);
+        }
+
+        async function corrigirComIA(id) {
+            const modal = document.getElementById('correcaoModal');
+            const textoDiv = document.getElementById('correcaoTexto');
+
+            modal.classList.add('active');
+            textoDiv.innerHTML = '<span class="loading"></span> Analisando sua redação com IA...';
+
+            try {
+                const response = await fetch(`${API_URL}/redacoes/${id}/correcao`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    textoDiv.innerHTML = 'Erro: ' + (data.error || 'Erro na correção');
+                    return;
+                }
+
+                textoDiv.innerHTML = data.correcao || 'Sem feedback disponível';
+            } catch (err) {
+                textoDiv.innerHTML = 'Erro de conexão: ' + err.message;
+            }
+        }
+    </script>
+</body>
+</html>
